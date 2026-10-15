@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rally</title>
+<meta name="description" content="All-or-nothing crowdfunding on BOT Chain. Back a campaign with BOT. If it misses its goal, you get every BOT back.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+:root{
+  --bg:#EDF2EE; --card:#FBFDFB; --ink:#0F2A24; --muted:#56706A; --rule:#CBD9D2;
+  --go:#14A35C; --go-ink:#FFFFFF; --track:#DCE7E1; --warn:#C2410C; --done:#2E5E9E;
+  --f:"Archivo",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#0C1A17;--card:#132621;--ink:#E4F0EA;--muted:#8FAAA2;--rule:#24403A;--track:#1D3530;--go:#2BC774;--go-ink:#05140D;--warn:#F08A5D;--done:#7FA9E6}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--f);font-stretch:100%;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--go);outline-offset:2px}
+.x{font-stretch:125%}
+
+header.top{display:flex;align-items:center;gap:14px;padding:14px 24px;flex-wrap:wrap}
+.logo{font:900 24px/1 var(--f);font-stretch:125%;letter-spacing:-.02em;margin-right:auto;display:flex;align-items:center;gap:10px}
+.logo svg{display:block}
+.who{font-size:14px;color:var(--muted)}
+.who b{color:var(--ink);font-weight:600}
+.bad{color:var(--warn);font-weight:600}
+
+.btn{border:1.5px solid var(--ink);background:transparent;padding:8px 15px;border-radius:999px;cursor:pointer;font-weight:700;font-size:15px}
+.btn:hover{background:var(--ink);color:var(--bg)}
+.btn.go{background:var(--go);border-color:var(--go);color:var(--go-ink)}
+.btn.go:hover{filter:brightness(1.06);background:var(--go);color:var(--go-ink)}
+.btn.ghost{border-color:var(--rule)}
+.btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn.warn:hover{background:var(--warn);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.hero{max-width:1120px;margin:0 auto;padding:40px 24px 28px;display:grid;grid-template-columns:1.4fr 1fr;gap:32px;align-items:end}
+.hero h1{margin:0;font:900 clamp(40px,7vw,84px)/.92 var(--f);font-stretch:125%;letter-spacing:-.035em}
+.hero p{margin:0 0 6px;color:var(--muted);max-width:44ch;font-size:17px}
+.hero .cta{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+@media (max-width:820px){.hero{grid-template-columns:1fr;padding:28px 16px 20px;gap:16px}}
+
+.strip{max-width:1120px;margin:0 auto 22px;padding:0 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+@media (max-width:820px){.strip{padding:0 16px}}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-right:auto}
+.tab{border:1.5px solid var(--rule);background:transparent;padding:6px 13px;border-radius:999px;cursor:pointer;font-size:14px;font-weight:700}
+.tab[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.wallet-bal{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.wallet-bal b{font-size:17px;color:var(--ink)}
+
+main{max-width:1120px;margin:0 auto;padding:0 24px 72px}
+@media (max-width:820px){main{padding:0 16px 56px}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px}
+@media (max-width:400px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h3{margin:0;font:800 21px/1.15 var(--f);font-stretch:112%;letter-spacing:-.015em;overflow-wrap:anywhere}
+.card .desc{margin:0;color:var(--muted);font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:6.2em;overflow:hidden}
+.link{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.state{font-size:13px;font-weight:700;align-self:flex-start;padding:3px 9px;border-radius:999px;background:var(--track)}
+.state.live{background:var(--go);color:var(--go-ink)}
+.state.funded,.state.collected{background:var(--done);color:#fff}
+.state.missed,.state.cancelled{background:var(--track);color:var(--muted)}
+
+/* the gauge: the one memorable element */
+.gauge{position:relative;padding-top:6px}
+.nums{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.raised{font:900 34px/1 var(--f);font-stretch:125%;letter-spacing:-.03em}
+.raised small{font:600 14px var(--f);font-stretch:100%;color:var(--muted);letter-spacing:0;margin-left:4px}
+.pct{font:800 17px/1 var(--f);font-stretch:125%}
+.track{position:relative;height:16px;background:var(--track);border-radius:4px;overflow:visible}
+.fill{position:absolute;inset:0 auto 0 0;background:var(--go);border-radius:4px;max-width:100%}
+.over{position:absolute;top:0;bottom:0;left:0;border-radius:4px;background:repeating-linear-gradient(-45deg,var(--go) 0 6px,transparent 6px 10px);opacity:.55}
+.goalmark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
+.under{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.under b{color:var(--ink);font-weight:700}
+.missed .fill,.cancelled .fill{background:var(--muted)}
+.funded .fill,.collected .fill{background:var(--done)}
+.funded .over,.collected .over{background:repeating-linear-gradient(-45deg,var(--done) 0 6px,transparent 6px 10px)}
+
+.mine{font-size:14px;padding:8px 10px;border-radius:8px;background:var(--bg)}
+.act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.act input{flex:1 1 120px;min-width:0;padding:8px 11px;border:1.5px solid var(--rule);border-radius:999px;background:var(--bg)}
+.act input:focus{border-color:var(--ink);outline:none}
+.creator{font-size:13px;color:var(--muted)}
+.empty{padding:48px 24px;text-align:center;color:var(--muted);border:1.5px dashed var(--rule);border-radius:14px}
+
+dialog{border:1px solid var(--rule);border-radius:16px;background:var(--card);color:var(--ink);padding:24px;width:min(460px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(6,18,14,.55)}
+dialog h2{margin:0 0 6px;font:800 24px/1.1 var(--f);font-stretch:118%}
+label{display:block;font-size:14px;font-weight:700;margin:14px 0 5px}
+.field{width:100%;padding:9px 12px;border:1.5px solid var(--rule);border-radius:10px;background:var(--bg)}
+.field:focus{border-color:var(--ink);outline:none}
+textarea.field{min-height:92px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:13px;color:var(--muted);margin:10px 0 0}
+.dlg-act{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.wallets{display:grid;gap:8px;margin:10px 0 4px}
+.wbtn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1.5px solid var(--rule);border-radius:10px;background:var(--bg);cursor:pointer;font-weight:700;text-align:left}
+.wbtn:hover{border-color:var(--ink)}
+.wbtn img{border-radius:6px}
+.wicon{width:28px;height:28px;border-radius:6px;background:var(--rule);display:inline-block}
+
+.foot{border-top:1px solid var(--rule);background:var(--card)}
+.foot-in{max-width:1120px;margin:0 auto;padding:28px 24px 36px;display:flex;flex-wrap:wrap;gap:20px 56px;align-items:center}
+@media (max-width:820px){.foot-in{padding:24px 16px 32px}}
+.foot-label{margin:0;font-size:13px;color:var(--muted)}
+.foot-name{margin:2px 0 0;font:900 28px/1 var(--f);font-stretch:125%;letter-spacing:-.02em}
+.foot-links{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:15px}
+.foot-links a{font-weight:700;overflow-wrap:anywhere}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;max-width:min(560px,calc(100% - 32px));font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;z-index:10}
+.toast.show{display:block}
+.toast a{color:var(--go);font-weight:700}
+@media (prefers-reduced-motion:no-preference){
+  .fill{transition:width .7s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{animation:up .2s ease-out}@keyframes up{from{opacity:0;transform:translate(-50%,8px)}}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="17" width="5" height="9" rx="1.5" fill="currentColor"/><rect x="11.5" y="10" width="5" height="16" rx="1.5" fill="currentColor"/><rect x="21" y="2" width="5" height="24" rx="1.5" fill="var(--go)"/></svg>
+    Rally
+  </div>
+  <span class="who" id="who">Not connected</span>
+  <button class="btn go" id="connect">Connect wallet</button>
+</header>
+
+<section class="hero">
+  <h1>Back it. If it falls short, you get it back.</h1>
+  <div>
+    <p>Campaigns on Rally raise BOT toward a goal by a deadline. If the goal is reached, the creator collects. If not, every backer is refunded in full. The contract holds the funds the whole time.</p>
+    <div class="cta"><button class="btn go" id="startBtn">Start a campaign</button></div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="tabs" role="group" aria-label="Filter campaigns">
+    <button class="tab" data-f="live" aria-pressed="true">Live</button>
+    <button class="tab" data-f="mine" aria-pressed="false">Mine</button>
+    <button class="tab" data-f="all" aria-pressed="false">All</button>
+  </div>
+  <div class="wallet-bal" id="balBox" hidden>Ready to withdraw <b id="bal">0</b> BOT <button class="btn ghost" id="withdraw">Withdraw</button></div>
+</div>
+
+<main>
+  <div class="grid" id="list"><div class="empty">Loading campaigns…</div></div>
+</main>
+
+<footer class="foot">
+  <div class="foot-in">
+    <div>
+      <p class="foot-label">Built on</p>
+      <p class="foot-name">BOT Chain</p>
+    </div>
+    <ul class="foot-links">
+      <li>BOT Chain official website: <a href="https://botchain.ai" target="_blank" rel="noopener">https://botchain.ai</a></li>
+      <li>BOT Chain Explorer: <a href="https://scan.botchain.ai" target="_blank" rel="noopener">https://scan.botchain.ai</a></li>
+      <li id="contractLi">Rally contract: <a id="contractLink" href="https://scan.botchain.ai" target="_blank" rel="noopener"></a></li>
+    </ul>
+  </div>
+</footer>
+
+<dialog id="startDlg" aria-labelledby="startH">
+  <form id="startForm" method="dialog">
+    <h2 id="startH">Start a campaign</h2>
+    <label for="cTitle">Name</label>
+    <input class="field" id="cTitle" maxlength="90" required placeholder="Community node for BOT Chain validators">
+    <label for="cDesc">What the money is for</label>
+    <textarea class="field" id="cDesc" maxlength="1500" required placeholder="What you'll build or buy, and how backers can follow progress."></textarea>
+    <label for="cLink">Link (optional)</label>
+    <input class="field" id="cLink" type="url" maxlength="200" placeholder="https://">
+    <div class="row">
+      <div><label for="cGoal">Goal (BOT)</label><input class="field" id="cGoal" type="number" min="0" step="any" required placeholder="100"></div>
+      <div><label for="cDays">Runs for</label>
+        <select class="field" id="cDays"><option value="3">3 days</option><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option></select>
+      </div>
+    </div>
+    <p class="hint" id="feeHint">If the goal is met you collect the total minus a 1% platform fee. If it isn't, backers are refunded and you pay nothing.</p>
+    <div class="dlg-act">
+      <button class="btn ghost" type="button" id="startCancel">Cancel</button>
+      <button class="btn go" type="submit">Start campaign</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="walletDlg" aria-labelledby="walletH">
+  <h2 id="walletH">Choose a wallet</h2>
+  <div id="walletList" class="wallets"></div>
+  <p class="hint">Any EVM wallet works. Your wallet will ask to switch to BOT Chain if needed.</p>
+  <div class="dlg-act"><button class="btn ghost" id="walletCancel" type="button">Cancel</button></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ---------------- config ----------------
+const CONFIG = {
+  contract: "", // set after deploying Rally
+  chainId: 677,
+  chainName: "BOT Chain",
+  explorer: "https://scan.botchain.ai",
+  rpc: "",       // optional public BOT Chain RPC so visitors can browse before connecting
+  pageSize: 60,
+};
+
+const ABI = [
+  "function campaignCount() view returns (uint256)",
+  "function getCampaign(uint256) view returns (tuple(address creator,uint40 deadline,bool cancelled,bool claimed,uint128 goal,uint128 pledged,uint32 backers,string metadataURI))",
+  "function pledgeOf(uint256,address) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function feeBps() view returns (uint16)",
+  "function createCampaign(uint128 goal,uint40 duration,string metadataURI) returns (uint256)",
+  "function pledge(uint256) payable",
+  "function unpledge(uint256,uint256)",
+  "function claim(uint256)",
+  "function refund(uint256)",
+  "function cancel(uint256)",
+  "function withdraw()",
+];
+
+const S = { browser:null, signer:null, me:null, read:null, write:null, items:[], filter:"live", fee:100, now:Math.floor(Date.now()/1000) };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const short = (a) => a ? a.slice(0,6) + "…" + a.slice(-4) : "";
+const same = (a,b) => a && b && a.toLowerCase() === b.toLowerCase();
+const bot = (wei) => { const n = Number(ethers.formatEther(wei)); return n >= 1000 ? n.toLocaleString(undefined,{maximumFractionDigits:0}) : n.toLocaleString(undefined,{maximumFractionDigits:4}); };
+function left(ts){
+  const d = ts - S.now; if (d <= 0) return null;
+  if (d < 3600) return `${Math.max(1,Math.round(d/60))} min left`;
+  if (d < 86400) return `${Math.round(d/3600)} h left`;
+  return `${Math.round(d/86400)} days left`;
+}
+function encodeMeta(o){ const b = new TextEncoder().encode(JSON.stringify(o)); let s=""; b.forEach(x => s += String.fromCharCode(x)); return "data:application/json;base64," + btoa(s); }
+function decodeMeta(uri){
+  try { if (uri.startsWith("data:application/json;base64,")) {
+    const j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(uri.slice(29)), c => c.charCodeAt(0))));
+    return { title: String(j.title || "Untitled campaign"), desc: String(j.description || ""), link: String(j.link || "") };
+  } } catch (e) {}
+  return { title: uri.slice(0,90), desc: "", link: "" };
+}
+let tt;
+function toast(html, ms = 5000){ const t = $("toast"); t.innerHTML = html; t.classList.add("show"); clearTimeout(tt); if (ms) tt = setTimeout(() => t.classList.remove("show"), ms); }
+function errMsg(e){
+  const m = e?.shortMessage || e?.info?.error?.message || e?.message || String(e);
+  if (/user rejected|ACTION_REJECTED/i.test(m)) return "You cancelled the transaction in your wallet.";
+  if (/insufficient funds/i.test(m)) return "Not enough BOT in your wallet for this amount plus gas.";
+  if (/could not coalesce|failed to fetch/i.test(m)) return `Couldn't reach ${CONFIG.chainName}. Check your connection and that your wallet is on ${CONFIG.chainName}.`;
+  const k = { InvalidParams:"Something isn't valid. Check the amount and details.", NotAuthorized:"Only the campaign creator can do that.",
+    CampaignEnded:"This campaign has ended.", CampaignActive:"This campaign is still running.", GoalNotMet:"The goal wasn't reached, so funds go back to backers.",
+    GoalMet:"This campaign reached its goal, so pledges aren't refundable.", AlreadyDone:"This campaign was already collected or cancelled.",
+    NothingToWithdraw:"There's nothing to withdraw.", EnforcedPause:"New campaigns and pledges are paused right now." };
+  for (const x in k) if (m.includes(x)) return k[x];
+  return m.length > 180 ? m.slice(0,180) + "…" : m;
+}
+async function send(label, fn, after){
+  if (!S.write) { toast("Connect your wallet first."); return false; }
+  if (!(await onRightChain())) { toast(`Switch your wallet to ${CONFIG.chainName} first.`); return false; }
+  try {
+    toast(`${label}: confirm in your wallet…`, 0);
+    const tx = await fn(S.write);
+    toast(`${label}: waiting for the network… <a href="${CONFIG.explorer}/tx/${tx.hash}" target="_blank" rel="noopener">View</a>`, 0);
+    await tx.wait();
+    if (after) after();
+    await refresh();
+    toast(`${label}: done. <a href="${CONFIG.explorer}/tx/${tx.hash}" target="_blank" rel="noopener">View</a>`);
+    return true;
+  } catch (e) { toast(errMsg(e), 8000); return false; }
+}
+
+// ---------------- wallets (EIP-6963, any EVM wallet) ----------------
+const WALLETS = new Map();
+window.addEventListener("eip6963:announceProvider", (e) => { const { info, provider } = e.detail || {}; if (info?.rdns && provider) WALLETS.set(info.rdns, { info, provider }); });
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+function walletList(){ const l = [...WALLETS.values()]; if (!l.length && window.ethereum) l.push({ info:{ rdns:"injected", name:"Browser wallet", icon:"" }, provider: window.ethereum }); return l; }
+function savedWallet(){ try { return localStorage.getItem("rally_wallet"); } catch (e) { return null; } }
+function saveWallet(r){ try { r ? localStorage.setItem("rally_wallet", r) : localStorage.removeItem("rally_wallet"); } catch (e) {} }
+function pickWallet(){
+  return new Promise((resolve) => {
+    const list = walletList(), dlg = $("walletDlg"), box = $("walletList");
+    box.innerHTML = list.length ? list.map((w,i) => {
+      const icon = /^data:image\/(png|svg\+xml|webp|jpeg);/i.test(w.info.icon || "") ? `<img src="${esc(w.info.icon)}" alt="" width="28" height="28">` : `<span class="wicon" aria-hidden="true"></span>`;
+      return `<button class="wbtn" type="button" data-i="${i}">${icon}<span>${esc(w.info.name || "Wallet")}</span></button>`;
+    }).join("") : `<p class="hint" style="margin:0">No wallet found in this browser. Install an EVM wallet such as MetaMask, Trust Wallet, Rabby, OKX or Coinbase Wallet, or open this page in your mobile wallet's browser.</p>`;
+    const done = (w) => { dlg.close(); resolve(w); };
+    box.onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) done(list[Number(b.dataset.i)]); };
+    $("walletCancel").onclick = () => done(null);
+    dlg.oncancel = () => resolve(null);
+    dlg.showModal();
+  });
+}
+let activeEth = null;
+function attach(eth){
+  if (activeEth === eth) return;
+  if (activeEth?.removeListener) { activeEth.removeListener("accountsChanged", onAccounts); activeEth.removeListener("chainChanged", onChain); }
+  activeEth = eth; eth.on?.("accountsChanged", onAccounts); eth.on?.("chainChanged", onChain);
+}
+function onAccounts(a){ if (!a || !a.length) { saveWallet(null); location.reload(); } else useWallet(activeEth, false); }
+function onChain(){ location.reload(); }
+async function onRightChain(){ if (!S.browser) return false; return Number((await S.browser.getNetwork()).chainId) === CONFIG.chainId; }
+async function switchChain(eth){
+  const hex = "0x" + CONFIG.chainId.toString(16);
+  try { await eth.request({ method:"wallet_switchEthereumChain", params:[{ chainId: hex }] }); }
+  catch (e) {
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902 && CONFIG.rpc) await eth.request({ method:"wallet_addEthereumChain", params:[{ chainId: hex, chainName: CONFIG.chainName, nativeCurrency:{ name:"BOT", symbol:"BOT", decimals:18 }, rpcUrls:[CONFIG.rpc], blockExplorerUrls:[CONFIG.explorer] }] });
+    else if (code === 4902) toast(`Add ${CONFIG.chainName} (chain ID ${CONFIG.chainId}) to your wallet, then try again.`, 9000);
+    else throw e;
+  }
+}
+async function useWallet(eth, ask = true){
+  try {
+    await eth.request({ method: ask ? "eth_requestAccounts" : "eth_accounts" });
+    attach(eth);
+    S.browser = new ethers.BrowserProvider(eth);
+    if (!(await onRightChain())) await switchChain(eth);
+    S.browser = new ethers.BrowserProvider(eth);
+    S.signer = await S.browser.getSigner();
+    S.me = await S.signer.getAddress();
+    if (CONFIG.contract) {
+      S.write = new ethers.Contract(CONFIG.contract, ABI, S.signer);
+      if (!CONFIG.rpc) S.read = new ethers.Contract(CONFIG.contract, ABI, S.browser);
+    }
+    await refresh();
+  } catch (e) { toast(errMsg(e), 8000); }
+}
+async function connect(){
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+  await new Promise(r => setTimeout(r, 150));
+  const list = walletList();
+  const w = list.length === 1 && !S.me ? list[0] : await pickWallet();
+  if (!w) return;
+  if (S.me && activeEth === w.provider) await w.provider.request({ method:"wallet_requestPermissions", params:[{ eth_accounts:{} }] }).catch(() => {});
+  saveWallet(w.info.rdns);
+  await useWallet(w.provider, true);
+}
+
+// ---------------- data ----------------
+function stateOf(c){
+  if (c.cancelled) return "cancelled";
+  if (c.claimed) return "collected";
+  if (S.now < c.deadline) return "live";
+  return c.pledged >= c.goal ? "funded" : "missed";
+}
+const LABEL = { live:"Live", funded:"Goal reached", collected:"Collected", missed:"Missed goal", cancelled:"Cancelled" };
+
+async function refresh(){
+  if (S.me) {
+    const right = await onRightChain();
+    $("who").innerHTML = right ? `<b>${short(S.me)}</b> on ${CONFIG.chainName}` : `<span class="bad">Wrong network. Switch to ${CONFIG.chainName}.</span>`;
+    $("connect").textContent = "Change wallet"; $("connect").classList.remove("go"); $("connect").classList.add("ghost");
+  }
+  if (!CONFIG.contract) { $("list").innerHTML = `<div class="empty">Rally isn't deployed yet. Set the contract address in CONFIG.</div>`; return; }
+  if (!S.read) return;
+  S.now = Math.floor(Date.now()/1000);
+  try {
+    const [count, fee] = await Promise.all([S.read.campaignCount(), S.read.feeBps()]);
+    S.fee = Number(fee);
+    $("feeHint").textContent = `If the goal is met you collect the total minus a ${S.fee/100}% platform fee. If it isn't, backers are refunded and you pay nothing.`;
+    const ids = []; for (let i = Number(count); i >= 1 && ids.length < CONFIG.pageSize; i--) ids.push(i);
+    const items = await Promise.all(ids.map(async id => {
+      const c = (await S.read.getCampaign(id)).toObject();
+      const mine = S.me ? await S.read.pledgeOf(id, S.me) : 0n;
+      return { id, ...c, deadline: Number(c.deadline), backers: Number(c.backers), mine, ...decodeMeta(c.metadataURI) };
+    }));
+    S.items = items.map(c => ({ ...c, state: stateOf(c) }));
+    render();
+    if (S.me) {
+      const b = await S.read.balanceOf(S.me);
+      $("bal").textContent = bot(b); $("balBox").hidden = b === 0n;
+    }
+  } catch (e) { $("list").innerHTML = `<div class="empty">Couldn't load campaigns: ${esc(errMsg(e))}</div>`; }
+}
+
+function gauge(c){
+  const goal = c.goal, raised = c.pledged;
+  const pct = goal > 0n ? Number((raised * 10000n) / goal) / 100 : 0;
+  // scale: the bar covers max(goal, raised); the goal mark sits where 100% is
+  const span = raised > goal ? raised : goal;
+  const fillW = span > 0n ? Number((raised * 10000n) / span) / 100 : 0;
+  const goalAt = span > 0n ? Number((goal * 10000n) / span) / 100 : 100;
+  const overW = raised > goal ? fillW - goalAt : 0;
+  const tl = left(c.deadline);
+  return `<div class="gauge ${c.state}">
+    <div class="nums"><span class="raised">${esc(bot(raised))}<small>of ${esc(bot(goal))} BOT</small></span><span class="pct">${pct >= 1000 ? Math.round(pct) : pct.toFixed(pct < 10 ? 1 : 0)}%</span></div>
+    <div class="track" role="img" aria-label="${pct.toFixed(0)} percent of goal raised">
+      <div class="fill" style="width:${Math.min(fillW, goalAt)}%"></div>
+      ${overW > 0 ? `<div class="over" style="left:${goalAt}%;width:${overW}%"></div>` : ""}
+      <div class="goalmark" style="left:calc(${goalAt}% - 1px)" title="Goal"></div>
+    </div>
+    <div class="under"><span><b>${c.backers}</b> ${c.backers === 1 ? "backer" : "backers"}</span><span>${tl ? `<b>${tl}</b>` : "Ended"}</span></div>
+  </div>`;
+}
+function actions(c){
+  if (!S.me) return "";
+  const creator = same(c.creator, S.me), a = [];
+  if (c.state === "live") {
+    a.push(`<div class="act"><input data-in="amt" type="number" min="0" step="any" placeholder="Amount in BOT" aria-label="Amount to pledge"><button class="btn go" data-a="pledge">Back this</button></div>`);
+    if (c.mine > 0n) a.push(`<div class="act"><button class="btn ghost" data-a="unpledge">Take back my ${esc(bot(c.mine))} BOT</button></div>`);
+    if (creator) a.push(`<div class="act"><button class="btn warn" data-a="cancel">Cancel campaign</button></div>`);
+  }
+  if (c.state === "funded" && creator) a.push(`<div class="act"><button class="btn go" data-a="claim">Collect ${esc(bot(c.pledged))} BOT</button></div>`);
+  if ((c.state === "missed" || c.state === "cancelled") && c.mine > 0n) a.push(`<div class="act"><button class="btn go" data-a="refund">Refund my ${esc(bot(c.mine))} BOT</button></div>`);
+  return a.join("");
+}
+function render(){
+  const f = S.filter;
+  const list = S.items.filter(c => f === "all" ? true : f === "live" ? c.state === "live" : (same(c.creator, S.me) || c.mine > 0n));
+  if (!list.length) {
+    $("list").innerHTML = `<div class="empty">${f === "mine" ? (S.me ? "You haven't started or backed a campaign yet." : "Connect your wallet to see your campaigns.") : f === "live" ? "No live campaigns right now. Start the first one." : "No campaigns yet. Start the first one."}</div>`;
+    return;
+  }
+  $("list").innerHTML = list.map(c => {
+    const link = /^https:\/\//i.test(c.link) ? `<a class="link" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer nofollow">${esc(c.link.replace(/^https:\/\//, ""))}</a>` : "";
+    const mine = c.mine > 0n && c.state === "live" ? `<div class="mine">You've pledged <b>${esc(bot(c.mine))} BOT</b>. You can take it back until the deadline.</div>` : "";
+    return `<article class="card" data-id="${c.id}">
+      <span class="state ${c.state}">${LABEL[c.state]}</span>
+      <h3>${esc(c.title)}</h3>
+      ${c.desc ? `<p class="desc">${esc(c.desc)}</p>` : ""}
+      ${link}
+      ${gauge(c)}
+      ${mine}
+      ${actions(c)}
+      <div class="creator">By ${same(c.creator, S.me) ? "you" : `<a href="${CONFIG.explorer}/address/${esc(c.creator)}" target="_blank" rel="noopener">${short(c.creator)}</a>`} · Campaign #${c.id}</div>
+    </article>`;
+  }).join("");
+}
+
+// ---------------- events ----------------
+function setFilter(f){ S.filter = f; document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-pressed", x.dataset.f === f)); }
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => { setFilter(b.dataset.f); render(); });
+$("connect").onclick = connect;
+$("startBtn").onclick = () => { if (!S.me) return connect(); $("startDlg").showModal(); };
+$("startCancel").onclick = () => $("startDlg").close();
+$("startForm").onsubmit = (e) => {
+  e.preventDefault();
+  let goal; try { goal = ethers.parseEther($("cGoal").value || "0"); } catch { return toast("Enter the goal as a number, like 100 or 2.5."); }
+  if (goal <= 0n) return toast("The goal has to be more than 0 BOT.");
+  const link = $("cLink").value.trim();
+  if (link && !/^https:\/\//i.test(link)) return toast("Links must start with https://");
+  const meta = encodeMeta({ title: $("cTitle").value.trim(), description: $("cDesc").value.trim(), link });
+  $("startDlg").close();
+  send("Start campaign", c => c.createCampaign(goal, Number($("cDays").value) * 86400, meta), () => { $("startForm").reset(); setFilter("mine"); });
+};
+$("list").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-a]"); if (!b) return;
+  const card = b.closest(".card"), id = Number(card.dataset.id), a = b.dataset.a;
+  const c = S.items.find(x => x.id === id);
+  if (a === "pledge") {
+    let v; try { v = ethers.parseEther(card.querySelector('[data-in="amt"]').value || "0"); } catch { return toast("Enter an amount like 5 or 0.5."); }
+    if (v <= 0n) return toast("Enter how much BOT to pledge.");
+    send("Pledge", k => k.pledge(id, { value: v }));
+  }
+  if (a === "unpledge") send("Take back", k => k.unpledge(id, c.mine));
+  if (a === "cancel" && confirm("Cancel this campaign? Every backer will be able to refund.")) send("Cancel", k => k.cancel(id));
+  if (a === "claim") send("Collect", k => k.claim(id));
+  if (a === "refund") send("Refund", k => k.refund(id));
+});
+$("withdraw").onclick = () => send("Withdraw", k => k.withdraw());
+
+// ---------------- boot ----------------
+(async function boot(){
+  if (CONFIG.contract) { $("contractLink").textContent = short(CONFIG.contract); $("contractLink").href = `${CONFIG.explorer}/address/${CONFIG.contract}`; }
+  else $("contractLi").hidden = true;
+  if (CONFIG.rpc && CONFIG.contract) { S.read = new ethers.Contract(CONFIG.contract, ABI, new ethers.JsonRpcProvider(CONFIG.rpc, CONFIG.chainId)); await refresh(); }
+  const saved = savedWallet();
+  if (saved) {
+    await new Promise(r => setTimeout(r, 200));
+    const w = walletList().find(x => x.info.rdns === saved);
+    if (w) { const a = await w.provider.request({ method:"eth_accounts" }).catch(() => []); if (a.length) return useWallet(w.provider, false); }
+  }
+  if (!S.read) $("list").innerHTML = `<div class="empty">${CONFIG.contract ? `Connect your wallet to see campaigns on ${CONFIG.chainName}.` : "Rally isn't deployed yet. Set the contract address in CONFIG."}</div>`;
+})();
+</script>
+</body>
+</html>

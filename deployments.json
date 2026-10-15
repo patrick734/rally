@@ -1,0 +1,10 @@
+{
+  "botMainnet": {
+    "chainId": 677,
+    "Rally": "0x6811f0FA5329E81Ef6BE0D6CbabF12f661F7d976",
+    "deployTx": "0x98e5e02ec1a586b9c1d94811cfb417a4214d32e9c1ee51354461d0bf5f47617f",
+    "owner": "0x3686f4A5cF47DCbaF0cE8eF3bE3F3231dafe5e4f",
+    "treasury": "0x3686f4A5cF47DCbaF0cE8eF3bE3F3231dafe5e4f",
+    "deployer": "0xcC9C1dAC538b7E698C95bAa0C66c345598634CC7"
+  }
+}

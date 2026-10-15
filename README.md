@@ -1,5 +1,8 @@
 # Rally — all-or-nothing crowdfunding on BOT Chain
 
+**Live on BOT Chain mainnet:** [`0x6811f0FA5329E81Ef6BE0D6CbabF12f661F7d976`](https://scan.botchain.ai/address/0x6811f0FA5329E81Ef6BE0D6CbabF12f661F7d976)
+(deploy tx [`0x98e5e02e…`](https://scan.botchain.ai/tx/0x98e5e02ec1a586b9c1d94811cfb417a4214d32e9c1ee51354461d0bf5f47617f))
+
 Creators set a goal in BOT and a deadline (1–90 days). Backers pledge BOT and can take
 their pledge back any time before the deadline.
 
